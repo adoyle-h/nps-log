@@ -1,0 +1,43 @@
+{
+  "name": "nps-log",
+  "version": "1.0.0",
+  "description": "A logger module based on winston for nodejs-project-snippets",
+  "main": "index.js",
+  "keywords": [
+    "log",
+    "nps"
+  ],
+  "engines": {
+    "node": "*"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adoyle-h/nps-log.git"
+  },
+  "author": "ADoyle <adoyle.h@gmail.com>",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/adoyle-h/nps-log/issues"
+  },
+  "homepage": "https://github.com/adoyle-h/nps-log#readme",
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "dependencies": {
+    "bytes": "^2.3.0",
+    "cli-color": "^1.1.0",
+    "lodash": "^4.5.1",
+    "pretty-error": "^2.0.0",
+    "sprintf-js": "^1.0.3",
+    "winston": "^2.1.1"
+  },
+  "devDependencies": {
+    "eslint": "^2.2.0",
+    "eslint-config-adoyle-style": "^0.2.0"
+  }
+}
