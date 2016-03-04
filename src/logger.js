@@ -1,116 +1,71 @@
 'use strict';
 
 var winston = require('winston');
-var winstonLogger = winston.Log;
+var winstonLogger = winston.Logger;
 var nodeUtil = require('util');
 var util = require('lodash');
 var vsprintf = require('sprintf-js').vsprintf;
 
 /**
- * @param   {Object}  options
- * @param   {Boolean}  [options.IS_PRODUCTION_ENV=false]
- * @param   {String}  [options.MESSAGE_CONNECTOR=' && ']
+ * @param  {Object}  options
+ * @param  {String}  [options.MESSAGE_CONNECTOR=' && ']
+ * @param  {Object[]}  [options.transports=null]
+ * @param  {Boolean}  [options.padLevels=false]
+ * @param  {Object}  [options.levels]  see https://github.com/winstonjs/winston#logging-levels
+ *                                     default to {error: 0, warn: 1, info: 2, verbose: 3, debug: 4, silly: 5}
+ * @param  {Object}  [options.colors]
+ * @param  {String}  [options.level='info']
+ * @param  {Boolean}  [options.emitErrs=false]
+ * @param  {Boolean}  [options.stripColors=false]
+ * @param  {Function|false}  [params.exitOnError]
+ * @param  {Function[]}  [options.rewriters=[]]
+ * @param  {Function[]}  [options.filters=[]]
+ * @param  {Function}  [options.exceptionHandlers=undefined]
+ * @param  {Function}  [options.modifyMetaWhenLogError]
+ * @param  {String} [options.filename] 当前 logger 所在文件路径
+ * @param  {Object<String, String>} [options.metaAliases] meta 字段重命名
  */
 function Logger(options) {
     var logger = this;
     winstonLogger.apply(this, arguments);
     logger.opts = options;
+    if (util.isFunction(options.modifyMetaWhenLogError)) {
+        logger._modifyMetaWhenLogError = options.modifyMetaWhenLogError;
+    }
+
+    if (util.isString(options.MESSAGE_CONNECTOR)) {
+        logger.MESSAGE_CONNECTOR = options.MESSAGE_CONNECTOR;
+    }
+
+    var metaAliases = options.metaAliases || {};
+    var _metaAliases = logger._metaAliases = {};
+
+    util.each(['filename'], function(metaProp) {
+        var alias = metaAliases[metaProp];
+        if (util.isString(alias) && (util.isEmpty(alias) === false)) {
+            _metaAliases[metaProp] = alias;
+        } else {
+            _metaAliases[metaProp] = metaProp;
+        }
+    });
 }
-util.inherits(Logger, winstonLogger);
+nodeUtil.inherits(Logger, winstonLogger);
 
 var winstonLog = winstonLogger.prototype.log;
 
-
 /**
- * 将目标对象(desc)的 key(property)对应的值，替换成默认值或者指定的值(alternative)
- *
- * 不同类型的 desc[property] 替换的默认值为：
- *   - String => '[secret String]'
- *   - Number => '[secret Number]'
- *   - Date => '[secret Date]'
- *   - Object|Array|Buffer => '[secret Object]'
- *
- * @side_effect desc
- * @param  {Object} desc
- * @param  {String} property
- * @param  {Any}    alternative
- * @method mask
+ * @method   _modifyMetaWhenLogError
+ * @param    {Error}  error
+ * @param    {Object}  meta  不要直接修改 meta！
+ * @return   {Object}  新的 meta
+ * @private
  */
-function mask(desc, property, alternative) {
-    /* eslint-disable no-param-reassign */
-    var val = util.get(desc, property);
-    if (util.isUndefined(val)) return undefined;
+// eslint-disable-next-line handle-callback-err
+Logger.prototype._modifyMetaWhenLogError = function(error, meta) {
+    return meta;
+};
 
-    if (arguments.length === 2) {
-        if (util.isString(val)) {
-            alternative = '[secret String]';
-        } else if (util.isNumber(val)) {
-            alternative = '[secret Number]';
-        } else if (util.isObject(val)) {
-            alternative = '[secret Object]';
-        } else if (util.isDate(val)) {
-            alternative = '[secret Date]';
-        }
-    }
-
-    util.set(desc, property, alternative);
-}
-
-/**
- * 根据 masks 制定的字段，直接修改传入的 meta 对应属性
- *
- * 如果对应属性为空，则 meta 不添加对应属性
- *
- * @side_effect meta
- * @param  {Object}               meta   元数据
- * @param  {Object|Array|String}  masks  如果为 Object，key 为指定属性，value 为替换值
- * @method maskMeta
- */
-function maskMeta(meta, masks) {
-    if (util.isArray(masks)) {
-        util.each(masks, function(property) {
-            mask(meta, property);
-        });
-    } else if (util.isObject(masks)) {
-        util.each(masks, function(alternative, property) {
-            mask(meta, property, alternative);
-        });
-    } else if (util.isString(masks)) {
-        mask(meta, masks);
-    }
-}
-
-/**
- * 如果 meta 的深度大于一层，不要去修改深层的属性！
- */
-function rewriteMeta(meta, rewriter) {
-    return rewriter(meta);
-}
-
-/**
- * 修改(增强)元数据
- *
- * @param  {Object} meta          元数据
- * @return {Object}               新的元数据
- * @method modifyMeta
- */
-function modifyMeta(meta) {
-    var $mask = meta.$mask;
-    var $rewriter = meta.$rewriter;
-    var omits = [];
-
-    if ($mask) {
-        maskMeta(meta, $mask);
-        omits.push('$mask');
-    }
-
-    if ($rewriter) {
-        meta = rewriteMeta(meta, $rewriter);
-        omits.push('$rewriter');
-    }
-
-    return util.omit(meta, omits);
-}
+Logger.prototype.MESSAGE_CONNECTOR = ' && ';
 
 /**
  * log 参数不限顺序，只要保证 message 在 meta 和 error 后面就行。
@@ -123,50 +78,52 @@ function modifyMeta(meta) {
  *     - meta.errorStack: error.stack,
  *     - meta.errorDetail: error.detail,
  *
- * @example
- * logger.info('this is message');
+ * Method Styles:
+ *    - log([error][, meta][, message[, params1, ... paramsN]])
+ *    - log([meta][, error][, message[, params1, ... paramsN]])
  *
- * @example
- * var meta = {
- *     a: 1,
- *     b: 2
- * };
- * logger.info(meta);
+ *   @example
+ *   logger.info('this is message');
  *
- * @example
- * logger.info(meta, 'message');
- * @example
- * logger.info(meta, 'id= %s', 1);
- * @example
- * logger.info(meta, 'object= %j', {a: 1});
+ *   @example
+ *   var meta = {
+ *       a: 1,
+ *       b: 2
+ *   };
+ *   logger.info(meta);
  *
- * @example
- * var err = new Error();
- * logger.error(err);
- * @example
- * err.meta = {a: 1, b: 2}   // 添加其他的元数据
- * logger.error(err);  // err.meta 会作为 meta 打印出来
- * @example
- * logger.error(err, 'extra message');  // err.message 会和 'extra message' 拼接输出。
- * @example
- * logger.info(meta, 'id= %s', 1);
+ *   @example
+ *   logger.info(meta, 'message');
+ *   @example
+ *   logger.info(meta, 'id= %s', 1);
+ *   @example
+ *   logger.info(meta, 'object= %j', {a: 1});
  *
- * @example
- * logger.error(meta, error);  // 如果同时存在 meta 和 error.meta 的同名属性，meta 的优先级更高
+ *   @example
+ *   var err = new Error();
+ *   logger.error(err);
+ *   @example
+ *   err.meta = {a: 1, b: 2}   // 添加其他的元数据
+ *   logger.error(err);  // err.meta 会作为 meta 打印出来
+ *   @example
+ *   logger.error(err, 'extra message');  // err.message 会和 'extra message' 拼接输出。
+ *   @example
+ *   logger.info(meta, 'id= %s', 1);
  *
+ *   @example
+ *   logger.error(meta, error);  // 如果同时存在 meta 和 error.meta 的同名属性，meta 的优先级更高
+ *
+ * @method log
  * @param  {String} message     具体写法见 https://github.com/alexei/sprintf.js#sprintfjs
  * @param  {Any}    params1..N  message 的填充参数
  * @param  {Object} meta        只支持深度为一层的 object
  * @param  {Error}  error       Error 对象
- * @method log([meta][, error], message[, params1, ... paramsN])
- * @method log([meta][, error])
- * @method log(message[, params1, ... paramsN])
- * @method log([error][, meta][, message[, params1, ... paramsN]])
  */
 function log(level) {
     if (arguments.length === 0) return undefined;
     var logger = this;
     var opts = logger.opts;
+    var _metaAliases = logger._metaAliases;
     var args = Array.prototype.slice.call(arguments, 1);
     var message, params, meta, error, preArgs, arg;
 
@@ -201,15 +158,10 @@ function log(level) {
     }
 
     if (error) {
-        meta = util.defaults({
-            errorName: error.name,
-            errorCode: error.code,
-            errorStack: error.stack,
-            errorDetail: error.detail,
-        }, meta, error.meta);
+        meta = logger._modifyMetaWhenLogError(error, meta) || meta;
 
         if (message) {
-            message = message + opts.MESSAGE_CONNECTOR + error.message;
+            message = message + logger.MESSAGE_CONNECTOR + error.message;
         } else {
             message = error.message;
         }
@@ -223,11 +175,12 @@ function log(level) {
 
     var logParams = [level, message];
 
+    if (opts.filename) {
+        meta = meta || {};
+        meta[_metaAliases.filename] = opts.filename;
+    }
+
     if (meta) {
-        if (opts.IS_PRODUCTION_ENV) {
-            // 在生产环境下，过滤/改写敏感信息
-            meta = modifyMeta(meta);
-        }
         logParams.push(meta);
     }
 
@@ -236,12 +189,37 @@ function log(level) {
     winstonLog.apply(logger, logParams);
 }
 
+Logger.prototype._log = winstonLog;
+
 Logger.prototype.log = function() {
     var logger = this;
-    var args = Array.prototype.slice.call(arguments, 1);
-    log.apply(logger, args);
+    var args = Array.prototype.slice.call(arguments);
+    return log.apply(logger, args);
 };
 
-Logger.prototype._log = winstonLog;
+function queryCallback(err, results) {
+    /* eslint no-console: 0 */
+    if (err) return console.error(err);
+    console.log(results);
+}
+
+var _query = Logger.prototype.query;
+Logger.prototype.query = function(options, callback) {
+    return _query.call(this, options, callback || queryCallback);
+};
+
+var _profile = Logger.prototype.profile;
+Logger.prototype.profile = function(message) {
+    var logger = this;
+    if (message) message = '[Profiling] ' + message;
+    else message = '[Profiling]';
+    _profile.call({
+        profilers: logger.profilers,
+        info: function(msg, meta, callback) {
+            return logger.info(meta, msg, callback);
+        },
+    }, message);
+    return logger;
+};
 
 module.exports = Logger;
