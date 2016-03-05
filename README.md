@@ -11,6 +11,10 @@
 A logger module based on [winston][] with enhanced features.
 
 
+## Document Translations
+
+- [简体中文](./doc/README.zh-Hans.md)
+
 ## TOC
 
 <!-- MarkdownTOC -->
