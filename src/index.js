@@ -61,32 +61,19 @@ function maskMeta(meta, masks) {
 }
 
 /**
- * 如果 meta 的深度大于一层，不要去修改深层的属性！
- */
-function rewriteMeta(meta, rewriter) {
-    return rewriter(meta);
-}
-
-/**
  * 修改(增强)元数据
  *
- * @method modifyMeta
- * @param  {Object} meta          元数据
- * @return {Object}               新的元数据
+ * @method  modifyMeta
+ * @param   {Object}  meta  元数据
+ * @return  {Object}  新的元数据
  */
 function modifyMeta(meta) {
     var $mask = meta.$mask;
-    var $rewriter = meta.$rewriter;
     var omits = [];
 
     if ($mask) {
         maskMeta(meta, $mask);
         omits.push('$mask');
-    }
-
-    if ($rewriter) {
-        meta = rewriteMeta(meta, $rewriter);
-        omits.push('$rewriter');
     }
 
     return util.omit(meta, omits);
@@ -157,15 +144,13 @@ exports.init = function(options) {
  * @return  {Logger}  logger
  */
 exports.create = function create(params) {
+    if (initialized === false) throw new Error('You should initialize the log module first.');
+
     params = util.defaults({}, params, {
         rewriters: [],
         modifyMetaWhenLogError: exports.defaultModifyMetaWhenLogError,
     });
     params = util.clone(params);
-    if (initialized === false) throw new Error('You should initialize the log module first.');
-    if (!params || !util.isString(params.filename)) {
-        throw new Error('Missing parameter `filename` for creating new logger.');
-    }
     params.rewriters.push(exports.defaultRewriter);
     return new Logger(params);
 };

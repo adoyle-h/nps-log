@@ -1,6 +1,6 @@
 {
   "name": "nps-log",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "A logger module based on winston with enhanced features",
   "main": "index.js",
   "keywords": [
