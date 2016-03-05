@@ -36,6 +36,7 @@
     "winston": "^2.0.0"
   },
   "devDependencies": {
+    "cz-conventional-changelog": "^1.1.5",
     "eslint": "^2.2.0",
     "eslint-config-adoyle-style": "^0.2.0"
   },
