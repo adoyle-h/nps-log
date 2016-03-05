@@ -1,10 +1,11 @@
 {
   "name": "nps-log",
   "version": "1.0.0",
-  "description": "A logger module based on winston for nodejs-project-snippets",
+  "description": "A logger module based on winston with enhanced features",
   "main": "index.js",
   "keywords": [
     "log",
+    "winston",
     "nps"
   ],
   "engines": {
@@ -18,7 +19,7 @@
     "url": "git+https://github.com/adoyle-h/nps-log.git"
   },
   "author": "ADoyle <adoyle.h@gmail.com>",
-  "license": "BSD-3-Clause",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/adoyle-h/nps-log/issues"
   },
